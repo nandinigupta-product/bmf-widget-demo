@@ -1,33 +1,10 @@
-/**
- * BMF Quick Order Widget (final)
- * - Works on WordPress pages (SEO/blog + homepage)
- * - City dropdown uses official BMF city codes (DEL, GUR, etc.) from Cities_list.json
- * - Rates fetched from BMF Rate API:
- *    https://www.bookmyforex.com/api/secure/v1/get-full-rate-card?city_code=<CODE>
- * - Robust JSON parsing: finds currency node anywhere, extracts buy/sell-like fields
- * - Auto-adopts BMF-ish theme by sniffing page computed styles (with safe fallbacks)
- *
- * Embed example (WordPress Custom HTML block):
- *  <div
- *    data-bmf-widget="quick-order"
- *    data-product="forex_card"
- *    data-city-code="DEL"
- *    data-currency="USD"
- *    data-amount="1000"
- *  ></div>
- *  <script async src="https://<your-host>/widget.js?v=1"></script>
- */
 (function () {
-  // ---------------------------
-  // CONFIG + CONSTANTS
-  // ---------------------------
   const DEFAULTS = {
-    product: "forex_card", // forex_card | currency_notes
+    product: "forex_card",
     city_code: "DEL",
     currency: "USD",
     amount: "1000",
 
-    // theme fallbacks (if style-sniff fails)
     themePrimary: "#e31b23",
     themeText: "#111827",
     themeMuted: "#6b7280",
@@ -42,87 +19,38 @@
     { value: "currency_notes", label: "Currency Notes" },
   ];
 
-  // ✅ Official serviceable cities (codes + descriptions) from your Cities_list.json
-  // NOTE: Icons/aliases kept only where present; we primarily use code + description.
-  const CITIES = {
-    GUR: { description: "Gurugram / Gurgaon", icon: "https://cdn.bookmyforex.com/city-image/gurgaon.png" },
-    DEL: { description: "Delhi", icon: "https://cdn.bookmyforex.com/city-image/delhi.png" },
-    NOI: { description: "Noida" },
-    MUM: { description: "Mumbai", icon: "https://cdn.bookmyforex.com/city-image/mumbai.png" },
-    BNG: { description: "Bengaluru", icon: "https://cdn.bookmyforex.com/city-image/bangalore.png" },
-    AHM: { description: "Ahmedabad", icon: "https://cdn.bookmyforex.com/city-image/ahmedabad.png" },
-    HUA: { description: "Hubballi" },
-    CHE: { description: "Chennai", icon: "https://cdn.bookmyforex.com/city-image/chennai.png" },
-    HYD: { description: "Hyderabad", icon: "https://cdn.bookmyforex.com/city-image/hyderabad.png" },
-    JAI: { description: "Jaipur", icon: "https://cdn.bookmyforex.com/city-image/jaipur.png" },
-    KOC: { description: "Kochi", icon: "https://cdn.bookmyforex.com/city-image/kochi.png" },
-    KOL: { description: "Kolkata", icon: "https://cdn.bookmyforex.com/city-image/kolkata.png" },
-    LUC: { description: "Lucknow", icon: "https://cdn.bookmyforex.com/city-image/lucknow.png" },
-    PTN: { description: "Patna", icon: "https://cdn.bookmyforex.com/city-image/patna.png" },
-    PUN: { description: "Pune", icon: "https://cdn.bookmyforex.com/city-image/pune.png" },
-    RNC: { description: "Ranchi", icon: "https://cdn.bookmyforex.com/city-image/ranchi.png" },
-    SUR: { description: "Surat", icon: "https://cdn.bookmyforex.com/city-image/surat.png" },
-    TRY: { description: "Trichy", icon: "https://cdn.bookmyforex.com/city-image/trichy.png" },
-    VAD: { description: "Vadodara", icon: "https://cdn.bookmyforex.com/city-image/vadodara.png" },
-    VIZ: { description: "Vizag", icon: "https://cdn.bookmyforex.com/city-image/vizag.png" },
-    AGR: { description: "Agra", icon: "https://cdn.bookmyforex.com/city-image/agra.png" },
-    BHO: { description: "Bhopal", icon: "https://cdn.bookmyforex.com/city-image/bhopal.png" },
-    BHU: { description: "Bhubaneswar", icon: "https://cdn.bookmyforex.com/city-image/bhubaneswar.png" },
-    CHA: { description: "Chandigarh", icon: "https://cdn.bookmyforex.com/city-image/chandigarh.png" },
-    COO: { description: "Coimbatore", icon: "https://cdn.bookmyforex.com/city-image/coimbatore.png" },
-    GOA: { description: "Goa", icon: "https://cdn.bookmyforex.com/city-image/goa.png" },
-    GUW: { description: "Guwahati", icon: "https://cdn.bookmyforex.com/city-image/guwahati.png" },
-    HAR: { description: "Haridwar", icon: "https://cdn.bookmyforex.com/city-image/haridwar.png" },
-    IND: { description: "Indore", icon: "https://cdn.bookmyforex.com/city-image/indore.png" },
-    JOD: { description: "Jodhpur", icon: "https://cdn.bookmyforex.com/city-image/jodhpur.png" },
-    LUD: { description: "Ludhiana", icon: "https://cdn.bookmyforex.com/city-image/ludhiana.png" },
-    NAG: { description: "Nagpur", icon: "https://cdn.bookmyforex.com/city-image/nagpur.png" },
-  };
-
-  const CURRENCIES = [
-    "USD","EUR","GBP","AED","SAR","CAD","AUD","SGD","THB","JPY","CHF","HKD","NZD","SEK","NOK","DKK"
-  ];
+  const CURRENCIES = ["USD", "EUR", "GBP", "AED", "SAR", "CAD", "AUD", "SGD", "THB", "JPY", "CHF", "HKD"];
 
   const BMF_RATE_API =
     "https://www.bookmyforex.com/api/secure/v1/get-full-rate-card?city_code=";
 
-  // ---------------------------
-  // UTILS
-  // ---------------------------
   function esc(s) {
     return String(s).replace(/[&<>"']/g, (c) => {
       const m = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
       return m[c] || c;
     });
   }
-
   function toNum(v) {
     const n = Number(String(v ?? "").replace(/,/g, "").trim());
     return Number.isFinite(n) ? n : null;
   }
-
   function formatINR(n) {
     if (!isFinite(n)) return "—";
     return n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
   }
-
   function formatRate(n) {
     if (!isFinite(n)) return "—";
     return n.toLocaleString("en-IN", { maximumFractionDigits: 4 });
   }
-
-  function nowTimeStr() {
-    try {
-      return new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-    } catch {
-      return "";
-    }
+  function prettifyAmount(raw) {
+    const cleaned = String(raw || "").replace(/,/g, "").trim();
+    const num = Number(cleaned);
+    if (!Number.isFinite(num) || num <= 0) return raw;
+    return num.toLocaleString("en-IN", { maximumFractionDigits: 2 });
   }
-
   function fallbackTatText() {
     return "Same-day if placed by 1PM (working days); otherwise next working day.";
   }
-
   function buildSelect(options, value) {
     return options
       .map((o) => {
@@ -134,49 +62,17 @@
       .join("");
   }
 
-  function buildCityOptions(selectedCode) {
-    const entries = Object.entries(CITIES);
-    entries.sort((a, b) => (a[1]?.description || a[0]).localeCompare(b[1]?.description || b[0]));
-    return entries
-      .map(([code, meta]) => {
-        const label = meta?.description || code;
-        const selected = String(code) === String(selectedCode) ? "selected" : "";
-        return `<option value="${esc(code)}" ${selected}>${esc(label)}</option>`;
-      })
-      .join("");
-  }
-
-  function normalizeAmountInput(raw) {
-    const cleaned = String(raw || "").replace(/,/g, "").trim();
-    if (!cleaned) return { num: null, cleaned: "" };
-    const num = Number(cleaned);
-    if (!isFinite(num) || num <= 0) return { num: null, cleaned };
-    return { num, cleaned };
-  }
-
-  function prettifyAmount(raw) {
-    const { num } = normalizeAmountInput(raw);
-    if (!num) return raw;
-    return num.toLocaleString("en-IN", { maximumFractionDigits: 2 });
-  }
-
-  // ---------------------------
-  // THEME SNIFF (BMF look & feel)
-  // ---------------------------
   function sniffTheme() {
     const theme = { ...DEFAULTS };
-
     const bodyStyle = getComputedStyle(document.body || document.documentElement);
     theme.fontFamily = bodyStyle.fontFamily || "inherit";
 
-    // Try to find BMF-like CTA button
     const btnCandidate =
       Array.from(document.querySelectorAll("button, a"))
         .find((el) => (el.textContent || "").trim().toUpperCase().includes("BOOK")) ||
       document.querySelector("button") ||
       document.querySelector("a");
 
-    // Try to find input/select on the page
     const inputCandidate =
       document.querySelector("select") ||
       document.querySelector('input[type="text"]') ||
@@ -191,7 +87,6 @@
       if (s.fontWeight) theme.btnWeight = s.fontWeight;
       if (s.letterSpacing) theme.btnLetterSpacing = s.letterSpacing;
     }
-
     if (inputCandidate) {
       const s = getComputedStyle(inputCandidate);
       if (s.borderColor) theme.themeBorder = s.borderColor;
@@ -200,8 +95,6 @@
       if (s.color) theme.themeText = s.color;
       if (s.backgroundColor) theme.inputBg = s.backgroundColor;
     }
-
-    // Defaults if not sniffed
     theme.btnText = theme.btnText || "#ffffff";
     theme.btnShadow = theme.btnShadow || "0 10px 22px rgba(0,0,0,0.12)";
     theme.btnWeight = theme.btnWeight || "900";
@@ -209,34 +102,63 @@
     theme.inputRadius = theme.inputRadius || theme.radius;
     theme.inputHeight = theme.inputHeight || "44px";
     theme.inputBg = theme.inputBg || "#fff";
-
     return theme;
   }
 
-  // ---------------------------
-  // API: fetch & parse rates
-  // ---------------------------
-  async function fetchBmfRateCard(cityCode) {
+  async function loadCities(citiesUrl) {
+    const res = await fetch(citiesUrl);
+    if (!res.ok) throw new Error(`Cities JSON fetch failed: ${res.status}`);
+    const json = await res.json();
+    const citiesObj = json?.cities || json?.data?.cities || json;
+    const entries = Object.entries(citiesObj || {})
+      .filter(([code, meta]) => /^[A-Z0-9]{2,6}$/.test(String(code)) && meta && typeof meta === "object")
+      .map(([code, meta]) => ({ code, label: meta.description || meta.name || code }))
+      .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+    if (!entries.length) throw new Error("No valid cities found");
+    return entries;
+  }
+
+  function buildCityOptions(cityArr, selectedCode) {
+    return cityArr
+      .map(({ code, label }) => {
+        const selected = String(code) === String(selectedCode) ? "selected" : "";
+        return `<option value="${esc(code)}" ${selected}>${esc(label)}</option>`;
+      })
+      .join("");
+  }
+
+  // ✅ Same-origin secure call (works on bookmyforex.com)
+  async function fetchBmfRateCardSameOrigin(cityCode) {
     const url = BMF_RATE_API + encodeURIComponent(cityCode || "");
     const res = await fetch(url, {
       method: "GET",
       credentials: "include",
-      headers: { Accept: "application/json" },
+      headers: {
+        "accept": "application/json, text/javascript, */*; q=0.01",
+        "x-requested-with": "XMLHttpRequest",
+      },
     });
-    if (!res.ok) throw new Error(`BMF Rate API failed: ${res.status}`);
-    return await res.json();
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Rate API failed: ${res.status} ${text.slice(0, 150)}`);
+    try { return JSON.parse(text); } catch { return text; }
   }
 
-  // Find the node for a currency anywhere in the JSON
+  // ✅ Proxy call (works on github.io if you provide a proxy)
+  async function fetchBmfRateCardViaProxy(proxyBaseUrl, cityCode) {
+    const url = proxyBaseUrl + "?" + new URLSearchParams({ city_code: cityCode || "" }).toString();
+    const res = await fetch(url, { method: "GET", headers: { "accept": "application/json" } });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Proxy failed: ${res.status} ${text.slice(0, 150)}`);
+    try { return JSON.parse(text); } catch { return text; }
+  }
+
   function findCurrencyNode(obj, currency) {
     const target = String(currency).toUpperCase();
     const seen = new Set();
-
     function walk(x) {
       if (!x || typeof x !== "object") return null;
       if (seen.has(x)) return null;
       seen.add(x);
-
       if (Array.isArray(x)) {
         for (const it of x) {
           const found = walk(it);
@@ -244,23 +166,18 @@
         }
         return null;
       }
-
       const code = x.currency || x.currency_code || x.ccy || x.code || x.symbol;
       if (code && String(code).toUpperCase() === target) return x;
-
       if (x[target] && typeof x[target] === "object") return x[target];
-
       for (const k of Object.keys(x)) {
         const found = walk(x[k]);
         if (found) return found;
       }
       return null;
     }
-
     return walk(obj);
   }
 
-  // Extract buy/sell-ish fields from the currency node (defensive mapping)
   function pickBuySell(node) {
     if (!node || typeof node !== "object") return { buy: null, sell: null };
 
@@ -275,8 +192,7 @@
       toNum(node.buying_rate) ??
       toNum(node.fx_card_buy) ??
       toNum(node.fxCardBuy) ??
-      toNum(node.rates?.buy) ??
-      toNum(node.rates?.BUY);
+      toNum(node.rates?.buy);
 
     const sell =
       toNum(node.sell) ??
@@ -289,8 +205,7 @@
       toNum(node.selling_rate) ??
       toNum(node.fx_card_sell) ??
       toNum(node.fxCardSell) ??
-      toNum(node.rates?.sell) ??
-      toNum(node.rates?.SELL);
+      toNum(node.rates?.sell);
 
     return { buy, sell };
   }
@@ -321,18 +236,16 @@
     return null;
   }
 
-  // ---------------------------
-  // RENDER
-  // ---------------------------
-  function renderOne(el) {
+  async function renderOne(el) {
     const product = el.getAttribute("data-product") || DEFAULTS.product;
     const city_code = el.getAttribute("data-city-code") || DEFAULTS.city_code;
     const currency = el.getAttribute("data-currency") || DEFAULTS.currency;
     const amount = el.getAttribute("data-amount") || DEFAULTS.amount;
 
-    const sniffed = sniffTheme();
+    const citiesUrl = el.getAttribute("data-cities-url") || "./cities.json";
+    const proxyUrl = el.getAttribute("data-proxy-url") || ""; // ✅ required for github.io demo
 
-    // Allow overrides via data-theme-*
+    const sniffed = sniffTheme();
     const theme = {
       ...sniffed,
       themePrimary: el.getAttribute("data-theme-primary") || sniffed.themePrimary,
@@ -342,225 +255,91 @@
       themeBg: el.getAttribute("data-theme-bg") || sniffed.themeBg,
     };
 
+    let cityArr = [];
+    try {
+      cityArr = await loadCities(citiesUrl);
+    } catch (e) {
+      cityArr = [
+        { code: "DEL", label: "Delhi" },
+        { code: "GUR", label: "Gurugram / Gurgaon" },
+        { code: "MUM", label: "Mumbai" },
+      ];
+      console.warn("Cities load failed, using fallback:", e);
+    }
+
     const uid = `bmfqo_${Math.random().toString(16).slice(2)}`;
 
     el.innerHTML = `
       <style>
-        #${uid}.bmfqo {
-          font-family: ${esc(theme.fontFamily || "inherit")};
-          color: ${esc(theme.themeText)};
-          max-width: 820px;
-        }
-        #${uid} .bmfqo-card {
-          background: ${esc(theme.themeBg)};
-          border: 1px solid ${esc(theme.themeBorder)};
-          border-radius: ${esc(theme.radius)};
-          overflow: hidden;
-          box-shadow: ${esc(theme.shadow)};
-        }
-        #${uid} .bmfqo-head {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 12px 16px;
-          background: rgba(227, 27, 35, 0.06);
-          border-bottom: 1px solid ${esc(theme.themeBorder)};
-        }
-        #${uid} .bmfqo-title {
-          font-weight: 900;
-          font-size: 14px;
-          letter-spacing: 0.02em;
-          text-transform: uppercase;
-        }
-        #${uid} .bmfqo-sub {
-          font-size: 12px;
-          color: ${esc(theme.themeMuted)};
-          margin-top: 2px;
-        }
-        #${uid} .bmfqo-pill {
-          font-size: 12px;
-          font-weight: 800;
-          color: ${esc(theme.themePrimary)};
-          background: rgba(227, 27, 35, 0.10);
-          padding: 6px 10px;
-          border-radius: 999px;
-          border: 1px solid rgba(227, 27, 35, 0.18);
-          white-space: nowrap;
-        }
-
-        #${uid} .bmfqo-body { padding: 16px; }
-
-        #${uid} .bmfqo-grid {
-          display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 12px;
-        }
-        @media (max-width: 860px) { #${uid} .bmfqo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        @media (max-width: 520px) { #${uid} .bmfqo-grid { grid-template-columns: 1fr; } }
-
-        #${uid} .bmfqo-field label {
-          display: block;
-          font-size: 12px;
-          font-weight: 900;
-          letter-spacing: 0.02em;
-          color: ${esc(theme.themeMuted)};
-          margin-bottom: 6px;
-          text-transform: uppercase;
-        }
-
-        #${uid} .bmfqo-control {
-          width: 100%;
-          height: ${esc(theme.inputHeight)};
-          border: 1px solid ${esc(theme.themeBorder)};
-          border-radius: ${esc(theme.inputRadius)};
-          padding: 0 12px;
-          font-size: 14px;
-          outline: none;
-          background: ${esc(theme.inputBg)};
-          color: ${esc(theme.themeText)};
-        }
-        #${uid} select.bmfqo-control { cursor: pointer; }
-
-        #${uid} .bmfqo-control:focus {
-          border-color: ${esc(theme.themePrimary)};
-          box-shadow: 0 0 0 3px rgba(227, 27, 35, 0.14);
-        }
-
-        #${uid} .bmfqo-row {
-          display: flex;
-          gap: 12px;
-          align-items: center;
-          margin-top: 14px;
-          flex-wrap: wrap;
-        }
-
-        #${uid} .bmfqo-ratebox {
-          flex: 1;
-          min-width: 280px;
-          border: 1px solid ${esc(theme.themeBorder)};
-          border-radius: ${esc(theme.radius)};
-          padding: 12px 14px;
-          background: rgba(17,24,39,0.02);
-        }
-        #${uid} .bmfqo-ratebox .line1 {
-          font-size: 12px;
-          color: ${esc(theme.themeMuted)};
-          margin-bottom: 6px;
-          display: flex;
-          justify-content: space-between;
-          gap: 10px;
-        }
-        #${uid} .bmfqo-ratebox .line2 {
-          font-size: 15px;
-          font-weight: 900;
-        }
-        #${uid} .bmfqo-ratebox .line3 {
-          margin-top: 8px;
-          font-size: 12px;
-          color: ${esc(theme.themeMuted)};
-          line-height: 1.35;
-        }
-
-        #${uid} .bmfqo-btn {
-          height: ${esc(theme.inputHeight)};
-          padding: 0 18px;
-          border: 0;
-          border-radius: ${esc(theme.inputRadius)};
-          background: ${esc(theme.themePrimary)};
-          color: ${esc(theme.btnText || "#fff")};
-          font-weight: ${esc(theme.btnWeight)};
-          letter-spacing: ${esc(theme.btnLetterSpacing)};
-          cursor: pointer;
-          text-transform: uppercase;
-          box-shadow: ${esc(theme.btnShadow)};
-        }
-        #${uid} .bmfqo-btn:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
-
-        #${uid} .bmfqo-note {
-          margin-top: 10px;
-          font-size: 12px;
-          color: ${esc(theme.themeMuted)};
-          line-height: 1.35;
-        }
-
-        #${uid} .bmfqo-error {
-          margin-top: 10px;
-          font-size: 12px;
-          color: ${esc(theme.themePrimary)};
-          font-weight: 900;
-          display: none;
-        }
+        #${uid}.bmfqo { font-family:${esc(theme.fontFamily || "inherit")}; color:${esc(theme.themeText)}; max-width:820px; }
+        #${uid} .card { background:${esc(theme.themeBg)}; border:1px solid ${esc(theme.themeBorder)}; border-radius:${esc(theme.radius)}; overflow:hidden; box-shadow:${esc(theme.shadow)}; }
+        #${uid} .head { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:rgba(227,27,35,.06); border-bottom:1px solid ${esc(theme.themeBorder)}; }
+        #${uid} .title { font-weight:900; font-size:14px; letter-spacing:.02em; text-transform:uppercase; }
+        #${uid} .sub { font-size:12px; color:${esc(theme.themeMuted)}; margin-top:2px; }
+        #${uid} .pill { font-size:12px; font-weight:800; color:${esc(theme.themePrimary)}; background:rgba(227,27,35,.10); padding:6px 10px; border-radius:999px; border:1px solid rgba(227,27,35,.18); white-space:nowrap; }
+        #${uid} .body { padding:16px; }
+        #${uid} .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+        @media(max-width:860px){ #${uid} .grid{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+        @media(max-width:520px){ #${uid} .grid{ grid-template-columns:1fr; } }
+        #${uid} label{ display:block; font-size:12px; font-weight:900; letter-spacing:.02em; color:${esc(theme.themeMuted)}; margin-bottom:6px; text-transform:uppercase; }
+        #${uid} .ctl{ width:100%; height:${esc(theme.inputHeight)}; border:1px solid ${esc(theme.themeBorder)}; border-radius:${esc(theme.inputRadius)}; padding:0 12px; font-size:14px; outline:none; background:${esc(theme.inputBg)}; color:${esc(theme.themeText)}; }
+        #${uid} .ctl:focus{ border-color:${esc(theme.themePrimary)}; box-shadow:0 0 0 3px rgba(227,27,35,.14); }
+        #${uid} .row{ display:flex; gap:12px; align-items:center; margin-top:14px; flex-wrap:wrap; }
+        #${uid} .box{ flex:1; min-width:280px; border:1px solid ${esc(theme.themeBorder)}; border-radius:${esc(theme.radius)}; padding:12px 14px; background:rgba(17,24,39,.02); }
+        #${uid} .l1{ font-size:12px; color:${esc(theme.themeMuted)}; margin-bottom:6px; display:flex; justify-content:space-between; gap:10px; }
+        #${uid} .l2{ font-size:15px; font-weight:900; }
+        #${uid} .l3{ margin-top:8px; font-size:12px; color:${esc(theme.themeMuted)}; line-height:1.35; }
+        #${uid} .btn{ height:${esc(theme.inputHeight)}; padding:0 18px; border:0; border-radius:${esc(theme.inputRadius)}; background:${esc(theme.themePrimary)}; color:${esc(theme.btnText || "#fff")}; font-weight:${esc(theme.btnWeight || "900")}; letter-spacing:${esc(theme.btnLetterSpacing || "0.03em")}; cursor:pointer; text-transform:uppercase; box-shadow:${esc(theme.btnShadow || "0 10px 22px rgba(0,0,0,0.12)")}; }
+        #${uid} .btn:disabled{ opacity:.55; cursor:not-allowed; box-shadow:none; }
+        #${uid} .note{ margin-top:10px; font-size:12px; color:${esc(theme.themeMuted)}; line-height:1.35; }
+        #${uid} .err{ margin-top:10px; font-size:12px; color:${esc(theme.themePrimary)}; font-weight:900; display:none; }
       </style>
 
       <div id="${uid}" class="bmfqo">
-        <div class="bmfqo-card">
-          <div class="bmfqo-head">
+        <div class="card">
+          <div class="head">
             <div>
-              <div class="bmfqo-title">Book an Order</div>
-              <div class="bmfqo-sub">City-based rates • then continue to checkout</div>
+              <div class="title">Book an Order</div>
+              <div class="sub">City-based rates • then continue to checkout</div>
             </div>
-            <div class="bmfqo-pill" data-role="status">Live rates</div>
+            <div class="pill" data-role="status">Live rates</div>
           </div>
-
-          <div class="bmfqo-body">
-            <div class="bmfqo-grid">
-              <div class="bmfqo-field">
+          <div class="body">
+            <div class="grid">
+              <div>
                 <label>Product</label>
-                <select class="bmfqo-control" data-role="product">
-                  ${buildSelect(PRODUCTS, product)}
-                </select>
+                <select class="ctl" data-role="product">${buildSelect(PRODUCTS, product)}</select>
               </div>
-
-              <div class="bmfqo-field">
+              <div>
                 <label>City</label>
-                <select class="bmfqo-control" data-role="city">
-                  ${buildCityOptions(city_code)}
-                </select>
+                <select class="ctl" data-role="city">${buildCityOptions(cityArr, city_code)}</select>
               </div>
-
-              <div class="bmfqo-field">
+              <div>
                 <label>Currency</label>
-                <select class="bmfqo-control" data-role="currency">
-                  ${buildSelect(CURRENCIES, currency)}
-                </select>
+                <select class="ctl" data-role="currency">${buildSelect(CURRENCIES, currency)}</select>
               </div>
-
-              <div class="bmfqo-field">
+              <div>
                 <label>Amount</label>
-                <input class="bmfqo-control" data-role="amount" inputmode="decimal" value="${esc(
-                  prettifyAmount(amount)
-                )}" />
+                <input class="ctl" data-role="amount" inputmode="decimal" value="${esc(prettifyAmount(amount))}" />
               </div>
             </div>
 
-            <div class="bmfqo-row">
-              <div class="bmfqo-ratebox">
-                <div class="line1">
-                  <span>
-                    Buy: <b>₹ <span data-role="buy">—</span></b>
-                    &nbsp;&nbsp;|&nbsp;&nbsp;
-                    Sell: <b>₹ <span data-role="sell">—</span></b>
-                  </span>
+            <div class="row">
+              <div class="box">
+                <div class="l1">
+                  <span>Buy: <b>₹ <span data-role="buy">—</span></b> | Sell: <b>₹ <span data-role="sell">—</span></b></span>
                   <span data-role="updated"></span>
                 </div>
-
-                <div class="line2">
-                  Total Amount: ₹ <span data-role="inr">—</span>
-                </div>
-
-                <div class="line3">
-                  Delivery: <span data-role="tat">—</span>
-                </div>
+                <div class="l2">Total Amount: ₹ <span data-role="inr">—</span></div>
+                <div class="l3">Delivery: <span data-role="tat">—</span></div>
               </div>
-
-              <button class="bmfqo-btn" data-role="cta" disabled>Book this order</button>
+              <button class="btn" data-role="cta" disabled>Book this order</button>
             </div>
 
-            <div class="bmfqo-note">
+            <div class="note">
               Note: Final payable can vary by product, denomination availability, and serviceability.
             </div>
-
-            <div class="bmfqo-error" data-role="error"></div>
+            <div class="err" data-role="error"></div>
           </div>
         </div>
       </div>
@@ -589,21 +368,36 @@
       $error.textContent = msg;
       $status.textContent = "Rate unavailable";
     }
-
     function clearError() {
       $error.style.display = "none";
       $error.textContent = "";
       $status.textContent = "Live rates";
     }
-
     function getAmountNumber() {
-      const { num } = normalizeAmountInput($amount.value);
-      return num;
+      const cleaned = String($amount.value || "").replace(/,/g, "").trim();
+      const n = Number(cleaned);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    }
+
+    async function getRates(cityCode, ccy) {
+      // If on BMF domain, secure same-origin should work
+      const onBmf = location.hostname.endsWith("bookmyforex.com");
+
+      if (onBmf) {
+        return await fetchBmfRateCardSameOrigin(cityCode);
+      }
+
+      // If not on BMF domain, require proxy
+      if (proxyUrl) {
+        return await fetchBmfRateCardViaProxy(proxyUrl, cityCode);
+      }
+
+      // No proxy → cannot access secure API cross-origin
+      throw new Error("Secure API cannot be called cross-origin. Add data-proxy-url or host demo on bookmyforex.com.");
     }
 
     async function recompute() {
       clearError();
-
       const amt = getAmountNumber();
       const cityCode = $city.value;
       const ccy = $currency.value;
@@ -619,8 +413,8 @@
       }
 
       if (isLoading) return;
-
       isLoading = true;
+
       $cta.disabled = true;
       $status.textContent = "Fetching…";
       $buy.textContent = "…";
@@ -629,29 +423,30 @@
       $updated.textContent = "";
 
       try {
-        const json = await fetchBmfRateCard(cityCode);
+        const json = await getRates(cityCode, ccy);
+
+        // If server soft-fails with empty array, treat as error
+        const isEmpty =
+          (Array.isArray(json) && json.length === 0) ||
+          (Array.isArray(json?.data) && json.data.length === 0) ||
+          (Array.isArray(json?.rates) && json.rates.length === 0);
+
+        if (isEmpty) {
+          throw new Error("Rate API returned empty data (likely missing session/auth context).");
+        }
+
         const node = findCurrencyNode(json, ccy);
         const { buy, sell } = pickBuySell(node);
         const tat = extractTat(json) || fallbackTatText();
-
         const useRate = buy != null ? buy : sell;
 
-        if (useRate == null) {
-          $buy.textContent = "—";
-          $sell.textContent = "—";
-          $inr.textContent = "—";
-          $tat.textContent = tat;
-          $updated.textContent = `Updated ${nowTimeStr()}`;
-          showError("Rates received but could not map currency fields (schema changed).");
-          return;
-        }
+        if (useRate == null) throw new Error("Could not map buy/sell fields from API response.");
 
         $buy.textContent = buy != null ? formatRate(buy) : "—";
         $sell.textContent = sell != null ? formatRate(sell) : "—";
         $inr.textContent = formatINR(amt * useRate);
         $tat.textContent = tat;
         $updated.textContent = `Updated ${nowTimeStr()}`;
-
         $cta.disabled = false;
         $status.textContent = "Live rates";
       } catch (e) {
@@ -660,56 +455,48 @@
         $inr.textContent = "—";
         $tat.textContent = fallbackTatText();
         $updated.textContent = "";
-        showError("Unable to fetch live rates right now. Please try again.");
+        showError(String(e?.message || "Unable to fetch rates."));
       } finally {
         isLoading = false;
       }
     }
 
-    // Debounce typing + format amount on blur
     let t = null;
-    function debounceRecompute() {
-      if (t) clearTimeout(t);
-      t = setTimeout(recompute, 350);
-    }
-
     $currency.addEventListener("change", recompute);
     $city.addEventListener("change", recompute);
     $product.addEventListener("change", recompute);
-
-    $amount.addEventListener("input", debounceRecompute);
+    $amount.addEventListener("input", () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(recompute, 350);
+    });
     $amount.addEventListener("blur", () => {
       $amount.value = prettifyAmount($amount.value);
       recompute();
     });
 
     $cta.addEventListener("click", () => {
-      const productVal = $product.value;
-      const cityVal = $city.value;
-      const ccyVal = $currency.value;
-      const amtVal = getAmountNumber();
-
-      // Redirect (update to your exact funnel URL later if needed)
       const url =
         "https://www.bookmyforex.com/?" +
         new URLSearchParams({
-          bmf_product: productVal,
-          bmf_city_code: cityVal,
-          bmf_ccy: ccyVal,
-          bmf_amt: amtVal != null ? String(amtVal) : "",
+          bmf_product: $product.value,
+          bmf_city_code: $city.value,
+          bmf_ccy: $currency.value,
+          bmf_amt: String(getAmountNumber() || ""),
         }).toString();
-
       window.location.href = url;
     });
 
-    // Initial compute
     recompute();
   }
 
-  function init() {
-    document.querySelectorAll('[data-bmf-widget="quick-order"]').forEach(renderOne);
+  async function init() {
+    const els = Array.from(document.querySelectorAll('[data-bmf-widget="quick-order"]'));
+    for (const el of els) await renderOne(el);
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-  else init();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => init().catch(console.error));
+  } else {
+    init().catch(console.error);
+  }
 })();
