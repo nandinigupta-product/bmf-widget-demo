@@ -242,7 +242,7 @@
     const currency = el.getAttribute("data-currency") || DEFAULTS.currency;
     const amount = el.getAttribute("data-amount") || DEFAULTS.amount;
 
-    const citiesUrl = el.getAttribute("data-cities-url") || "./cities.json";
+    const citiesUrl = el.getAttribute("data-cities-url") || "./Cities_list.json";
     const proxyUrl = el.getAttribute("data-proxy-url") || ""; // ✅ required for github.io demo
 
     const sniffed = sniffTheme();
