@@ -134,7 +134,6 @@
     const url = BMF_RATE_API + encodeURIComponent(cityCode || "");
     const res = await fetch(url, {
       method: "GET",
-      credentials: "include", // will only help when cookies are first-party / allowed
       headers: {
         "accept": "application/json, text/javascript, */*; q=0.01",
         "x-requested-with": "XMLHttpRequest",
