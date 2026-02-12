@@ -4,7 +4,7 @@
   // ---------------------------
   const DEFAULTS = {
     product: "forex_card", // forex_card | currency_notes
-    city_code: "delhi",
+    city_code: "del",
     currency: "USD",
     amount: "1000",
 
