@@ -136,7 +136,6 @@
       method: "GET",
       headers: {
         "accept": "application/json, text/javascript, */*; q=0.01",
-        "x-requested-with": "XMLHttpRequest",
         "cookie": "JSESSIONID=48CD6D911AA8D4DACAAC8CE2E08F32CB; _sec_token_csrf=1becf3e6-3d15-4419-be28-a44bb5133e51; _ga=GA1.1.1236232642.1770800667; _fbp=fb.1.1770800667376.670369774512072129; twk_idm_key=im_1XNt0_wd9ik5960t4s; G_ENABLED_IDPS=google; _gcl_au=1.1.352657580.1770802402; _uetsid=b374d900072811f18293db941787d62f; _uetvid=b374ea40072811f1a98edff2baea1d94; _ga_5MVFP81LJV=GS2.1.s1770889317$o6$g1$t1770891534$j58$l0$h0; TawkConnectionTime=0; twk_uuid_5a0d3b93198bd56b8c03b71f=%7B%22uuid%22%3A%221.Ws4iwz0jLj2j8G6UQC1CS2v2FAjSOSrQ5kvZ8zRCq7KugNXTU4hgczXqddxuhyOI4ig8mNfVFP8E3yMPno527hFdZsRCpo05thWjkTCSAZcz3d2maCoNRVtZm%22%2C%22version%22%3A3%2C%22domain%22%3A%22bookmyforex.com%22%2C%22ts%22%3A1770891538986%7D; JSESSIONID=09E5D6C1AB20E03CC7A87AED09D55D53"
         
         // Note: 'content-type' isn't needed for GET; some servers ignore it anyway.
