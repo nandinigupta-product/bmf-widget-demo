@@ -4,7 +4,6 @@
     city_code: "DEL",
     currency: "USD",
     amount: "1000",
-
     themePrimary: "#e31b23",
     themeText: "#111827",
     themeMuted: "#6b7280",
@@ -105,15 +104,18 @@
     return theme;
   }
 
+  // ✅ Cities file name updated here: Cities_list.json
   async function loadCities(citiesUrl) {
     const res = await fetch(citiesUrl);
     if (!res.ok) throw new Error(`Cities JSON fetch failed: ${res.status}`);
     const json = await res.json();
     const citiesObj = json?.cities || json?.data?.cities || json;
+
     const entries = Object.entries(citiesObj || {})
       .filter(([code, meta]) => /^[A-Z0-9]{2,6}$/.test(String(code)) && meta && typeof meta === "object")
       .map(([code, meta]) => ({ code, label: meta.description || meta.name || code }))
       .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+
     if (!entries.length) throw new Error("No valid cities found");
     return entries;
   }
@@ -127,28 +129,21 @@
       .join("");
   }
 
-  // ✅ Same-origin secure call (works on bookmyforex.com)
-  async function fetchBmfRateCardSameOrigin(cityCode) {
+  // ✅ Direct API as-is. Adds only browser-allowed headers.
+  async function fetchBmfRateCard(cityCode) {
     const url = BMF_RATE_API + encodeURIComponent(cityCode || "");
     const res = await fetch(url, {
       method: "GET",
-      credentials: "include",
+      credentials: "include", // will only help when cookies are first-party / allowed
       headers: {
         "accept": "application/json, text/javascript, */*; q=0.01",
         "x-requested-with": "XMLHttpRequest",
+        // Note: 'content-type' isn't needed for GET; some servers ignore it anyway.
       },
     });
+
     const text = await res.text();
     if (!res.ok) throw new Error(`Rate API failed: ${res.status} ${text.slice(0, 150)}`);
-    try { return JSON.parse(text); } catch { return text; }
-  }
-
-  // ✅ Proxy call (works on github.io if you provide a proxy)
-  async function fetchBmfRateCardViaProxy(proxyBaseUrl, cityCode) {
-    const url = proxyBaseUrl + "?" + new URLSearchParams({ city_code: cityCode || "" }).toString();
-    const res = await fetch(url, { method: "GET", headers: { "accept": "application/json" } });
-    const text = await res.text();
-    if (!res.ok) throw new Error(`Proxy failed: ${res.status} ${text.slice(0, 150)}`);
     try { return JSON.parse(text); } catch { return text; }
   }
 
@@ -212,18 +207,8 @@
 
   function extractTat(json) {
     const candidates = [
-      json?.tat,
-      json?.delivery_tat,
-      json?.deliveryTat,
-      json?.delivery_eta,
-      json?.deliveryEta,
-      json?.sla,
-      json?.data?.tat,
-      json?.data?.delivery_tat,
-      json?.data?.deliveryTat,
-      json?.data?.delivery_eta,
-      json?.data?.deliveryEta,
-      json?.data?.sla,
+      json?.tat, json?.delivery_tat, json?.deliveryTat, json?.delivery_eta, json?.deliveryEta, json?.sla,
+      json?.data?.tat, json?.data?.delivery_tat, json?.data?.deliveryTat, json?.data?.delivery_eta, json?.data?.deliveryEta, json?.data?.sla,
     ];
     for (const c of candidates) {
       if (typeof c === "string" && c.trim()) return c.trim();
@@ -242,8 +227,8 @@
     const currency = el.getAttribute("data-currency") || DEFAULTS.currency;
     const amount = el.getAttribute("data-amount") || DEFAULTS.amount;
 
+    // ✅ Default name updated: Cities_list.json (host next to widget.js)
     const citiesUrl = el.getAttribute("data-cities-url") || "./Cities_list.json";
-    const proxyUrl = el.getAttribute("data-proxy-url") || ""; // ✅ required for github.io demo
 
     const sniffed = sniffTheme();
     const theme = {
@@ -304,6 +289,7 @@
             </div>
             <div class="pill" data-role="status">Live rates</div>
           </div>
+
           <div class="body">
             <div class="grid">
               <div>
@@ -336,9 +322,7 @@
               <button class="btn" data-role="cta" disabled>Book this order</button>
             </div>
 
-            <div class="note">
-              Note: Final payable can vary by product, denomination availability, and serviceability.
-            </div>
+            <div class="note">Note: Final payable can vary by product, denomination availability, and serviceability.</div>
             <div class="err" data-role="error"></div>
           </div>
         </div>
@@ -355,7 +339,6 @@
     const $sell = root.querySelector('[data-role="sell"]');
     const $inr = root.querySelector('[data-role="inr"]');
     const $tat = root.querySelector('[data-role="tat"]');
-    const $updated = root.querySelector('[data-role="updated"]');
 
     const $cta = root.querySelector('[data-role="cta"]');
     const $error = root.querySelector('[data-role="error"]');
@@ -379,23 +362,6 @@
       return Number.isFinite(n) && n > 0 ? n : null;
     }
 
-    async function getRates(cityCode, ccy) {
-      // If on BMF domain, secure same-origin should work
-      const onBmf = location.hostname.endsWith("bookmyforex.com");
-
-      if (onBmf) {
-        return await fetchBmfRateCardSameOrigin(cityCode);
-      }
-
-      // If not on BMF domain, require proxy
-      if (proxyUrl) {
-        return await fetchBmfRateCardViaProxy(proxyUrl, cityCode);
-      }
-
-      // No proxy → cannot access secure API cross-origin
-      throw new Error("Secure API cannot be called cross-origin. Add data-proxy-url or host demo on bookmyforex.com.");
-    }
-
     async function recompute() {
       clearError();
       const amt = getAmountNumber();
@@ -407,11 +373,9 @@
         $sell.textContent = "—";
         $inr.textContent = "—";
         $tat.textContent = "—";
-        $updated.textContent = "";
         $cta.disabled = true;
         return;
       }
-
       if (isLoading) return;
       isLoading = true;
 
@@ -420,33 +384,29 @@
       $buy.textContent = "…";
       $sell.textContent = "…";
       $tat.textContent = "…";
-      $updated.textContent = "";
 
       try {
-        const json = await getRates(cityCode, ccy);
+        const json = await fetchBmfRateCard(cityCode);
 
-        // If server soft-fails with empty array, treat as error
         const isEmpty =
           (Array.isArray(json) && json.length === 0) ||
           (Array.isArray(json?.data) && json.data.length === 0) ||
           (Array.isArray(json?.rates) && json.rates.length === 0);
 
-        if (isEmpty) {
-          throw new Error("Rate API returned empty data (likely missing session/auth context).");
-        }
+        if (isEmpty) throw new Error("API returned empty data (needs a valid session on bookmyforex.com).");
 
         const node = findCurrencyNode(json, ccy);
         const { buy, sell } = pickBuySell(node);
         const tat = extractTat(json) || fallbackTatText();
-        const useRate = buy != null ? buy : sell;
 
+        const useRate = buy != null ? buy : sell;
         if (useRate == null) throw new Error("Could not map buy/sell fields from API response.");
 
         $buy.textContent = buy != null ? formatRate(buy) : "—";
         $sell.textContent = sell != null ? formatRate(sell) : "—";
         $inr.textContent = formatINR(amt * useRate);
         $tat.textContent = tat;
-        $updated.textContent = `Updated ${nowTimeStr()}`;
+
         $cta.disabled = false;
         $status.textContent = "Live rates";
       } catch (e) {
@@ -454,7 +414,6 @@
         $sell.textContent = "—";
         $inr.textContent = "—";
         $tat.textContent = fallbackTatText();
-        $updated.textContent = "";
         showError(String(e?.message || "Unable to fetch rates."));
       } finally {
         isLoading = false;
